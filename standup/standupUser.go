@@ -8,7 +8,7 @@ import (
 
 type standupUser struct {
 	*slack.User
-	data standupData
+	Data standupData
 }
 
 func (u standupUser) FirstName() string {

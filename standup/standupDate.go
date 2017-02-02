@@ -1,7 +1,9 @@
 package standup
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -9,6 +11,31 @@ type standupDate struct {
 	year  int
 	month time.Month
 	day   int
+}
+
+func standupDateFromString(src string) (standupDate, error) {
+	pieces := strings.Split(src, "-")
+	if len(pieces) != 3 {
+		return standupDate{}, fmt.Errorf("invalid standupDate string=%q", src)
+	}
+	year, err := strconv.Atoi(pieces[0])
+	if err != nil {
+		return standupDate{}, fmt.Errorf("invalid year=%q", pieces[0])
+	}
+	month, err := strconv.Atoi(pieces[1])
+	if err != nil {
+		return standupDate{}, fmt.Errorf("invalid month=%q", pieces[1])
+	}
+	day, err := strconv.Atoi(pieces[2])
+	if err != nil {
+		return standupDate{}, fmt.Errorf("invalid day=%q", pieces[2])
+	}
+	sd := standupDate{
+		year:  year,
+		month: time.Month(month),
+		day:   day,
+	}
+	return sd, nil
 }
 
 func getStandupDate(daysFromToday int) standupDate {
@@ -40,7 +67,8 @@ func (sd standupDate) next() standupDate {
 }
 
 func (sd standupDate) String() string {
-	return strconv.Itoa(sd.year) + "-" + sd.month.String() + "-" + strconv.Itoa(sd.day)
+	s := fmt.Sprintf("%04v-%02v-%02v", sd.year, int(sd.month), sd.day)
+	return s
 }
 
 func (sd standupDate) Unix() int64 {

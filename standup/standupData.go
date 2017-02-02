@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 type standupData struct {
@@ -14,6 +16,21 @@ type standupData struct {
 	LastUpdate time.Time
 }
 
+func (sd *standupData) Update(section sectionMatch) error {
+	log.Infof("sd=%+v", sd)
+	switch section.name {
+	case "yesterday":
+		sd.Yesterday = section.text
+	case "today":
+		sd.Today = section.text
+	case "blocking":
+		sd.Blocking = section.text
+	default:
+		return fmt.Errorf("unrecognized section.name=%q", section.name)
+	}
+	return nil
+}
+
 func (sd standupData) String() string {
 	str := fmt.Sprintf("Yesterday: %s\n", sd.Yesterday)
 	str += fmt.Sprintf("Today: %s\n", sd.Today)
@@ -21,14 +38,18 @@ func (sd standupData) String() string {
 	return str
 }
 
-type standupMap map[standupDate]standupUsers
+type standupMap map[string]standupUsers
 
-func (sm standupMap) Keys() standupDates {
+func (sm standupMap) Keys() (standupDates, error) {
 	keys := make(standupDates, 0, len(sm))
 	for k := range sm {
-		keys = append(keys, k)
+		sd, err := standupDateFromString(k)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, sd)
 	}
-	return keys
+	return keys, nil
 }
 
 // Filter returns a copy of standupMap filtered by user fields [Name || Email]
@@ -88,9 +109,14 @@ DATE
 ....
 
 */
-func (sm standupMap) String() (str string) {
-	sorted := sm.Keys()
+func (sm standupMap) String() (string, error) {
+	sorted, err := sm.Keys()
+	if err != nil {
+		return "", err
+	}
 	sort.Sort(sorted)
+
+	var str string
 
 	// first pass detects if there are multiple users or a single user (email is used as unique ID)
 	seenUsers := make(map[string]standupUser)
@@ -98,7 +124,7 @@ func (sm standupMap) String() (str string) {
 	singleUserReport := false
 
 	for _, sdate := range sorted {
-		users := sm[sdate]
+		users := sm[sdate.String()]
 		for _, user := range users {
 			seenUsers[user.Profile.Email] = user
 			lastUser = user
@@ -115,7 +141,7 @@ func (sm standupMap) String() (str string) {
 
 	// second pass stringifies the body and only prints user name if multiple users exist
 	for _, sdate := range sorted {
-		users := sm[sdate]
+		users := sm[sdate.String()]
 		str += fmt.Sprintf("%s\n", sdate.String())
 		str += fmt.Sprintf("%s\n", lineBreak(len(sdate.String())))
 		for _, user := range users {
@@ -123,11 +149,11 @@ func (sm standupMap) String() (str string) {
 			if !singleUserReport {
 				str += fmt.Sprintf("%s\n", user.Name)
 			}
-			str += fmt.Sprintf("%s\n", user.data.String())
+			str += fmt.Sprintf("%s\n", user.Data.String())
 		}
 	}
 
 	// replace multiple newlines with a single newline at the end.
 	str = strings.TrimRight(str, "\n") + "\n"
-	return
+	return str, nil
 }
