@@ -18,12 +18,12 @@ type standupData struct {
 
 func (sd *standupData) Update(section sectionMatch) error {
 	log.Infof("sd=%+v", sd)
-	switch section.name {
-	case "yesterday":
+	switch section.name[0] {
+	case 'y':
 		sd.Yesterday = section.text
-	case "today":
+	case 't':
 		sd.Today = section.text
-	case "blocking":
+	case 'b':
 		sd.Blocking = section.text
 	default:
 		return fmt.Errorf("unrecognized section.name=%q", section.name)

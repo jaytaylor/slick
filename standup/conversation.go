@@ -9,7 +9,7 @@ import (
 	"github.com/abourget/slick"
 )
 
-var sectionRegexp = regexp.MustCompile(`(?mi)^!(yesterday|today|blocking)`)
+var sectionRegexp = regexp.MustCompile(`(?mi)^!(y(esterday)?|t(?:oday)?|b(?:lock(?:ers?|ed|ing))?)`)
 
 type sectionMatch struct {
 	name string
@@ -24,7 +24,15 @@ func extractSectionAndText(input string, res [][]int) []sectionMatch {
 		el := res[i]
 
 		section := input[el[2]:el[3]] // (2,3) is second group's (start,end)
-		strings.ToLower(section)
+		section = strings.ToLower(section)
+		switch section[0] {
+		case 'y':
+			section = "yesterday"
+		case 't':
+			section = "today"
+		case 'b':
+			section = "blockers"
+		}
 
 		var endFullText = len(input)
 		if (i + 1) < len(res) {
