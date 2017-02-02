@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"reflect"
@@ -13,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
 	"github.com/nlopes/slack"
 	"github.com/tuxychandru/pubsub"
@@ -79,12 +79,12 @@ func (bot *Bot) Run() {
 	// Write PID
 	err := bot.writePID()
 	if err != nil {
-		log.Fatal("Couldn't write PID file:", err)
+		log.Fatalf("Couldn't write PID file: %s", err)
 	}
 
 	db, err := bolt.Open(bot.Config.DBPath, 0600, nil)
 	if err != nil {
-		log.Fatalf("Could not initialize BoltDB key/value store: %s\n", err)
+		log.Fatalf("Could not initialize BoltDB key/value store: %s", err)
 	}
 	defer func() {
 		log.Fatal("Database is closing")
@@ -113,8 +113,7 @@ func (bot *Bot) Run() {
 			typeList = append(typeList, "WebPlugin")
 		}
 
-		log.Printf("Plugin %s implements %s", pluginType.String(),
-			strings.Join(typeList, ", "))
+		log.Infof("Plugin %s implements %s", pluginType.String(), strings.Join(typeList, ", "))
 		enabledPlugins = append(enabledPlugins, strings.Replace(pluginType.String(), ".", "_", -1))
 	}
 
@@ -172,7 +171,7 @@ func (bot *Bot) Listen(listen *Listener) error {
 
 	err := listen.checkParams()
 	if err != nil {
-		log.Println("Bot.Listen(): Invalid Listener: ", err)
+		log.Errorf("Bot.Listen(): Invalid Listener: %s", err)
 		return err
 	}
 
@@ -219,7 +218,7 @@ func (bot *Bot) addListener(listen *Listener) {
 }
 
 func (bot *Bot) Notify(room, color, format, msg string, notify bool) error {
-	log.Println("DEPRECATED. Please use the Slack API with .PostMessage")
+	log.Warn("DEPRECATED. Please use the Slack API with .PostMessage")
 	// bot.api.PostMessage(room, msg, slack.PostMessageParameters{
 	// 	Attachments: []slack.Attachment{
 	// 		{
@@ -234,7 +233,7 @@ func (bot *Bot) Notify(room, color, format, msg string, notify bool) error {
 func (bot *Bot) setupHandlers() {
 	go bot.replyHandler()
 	go bot.messageHandler()
-	log.Println("Bot ready")
+	log.Info("Bot ready")
 }
 
 func (bot *Bot) cacheUsers(users []slack.User) {
@@ -261,7 +260,7 @@ func (bot *Bot) cacheChannels(channels []slack.Channel, groups []slack.Group, im
 
 func (bot *Bot) loadBaseConfig() {
 	if err := checkPermission(bot.configFile); err != nil {
-		log.Fatal("ERROR Checking Permissions: ", err)
+		log.Fatalf("ERROR Checking Permissions: %s", err)
 	}
 
 	var config struct {
@@ -269,7 +268,7 @@ func (bot *Bot) loadBaseConfig() {
 	}
 	err := bot.LoadConfig(&config)
 	if err != nil {
-		log.Fatalln("Error loading Slack config section:", err)
+		log.Fatalf("Error loading Slack config section: %s", err)
 	} else {
 		bot.Config = config.Slack
 	}
@@ -278,13 +277,13 @@ func (bot *Bot) loadBaseConfig() {
 func (bot *Bot) LoadConfig(config interface{}) (err error) {
 	content, err := ioutil.ReadFile(bot.configFile)
 	if err != nil {
-		log.Fatalln("LoadConfig(): Error reading config:", err)
+		log.Fatalf("LoadConfig(): Error reading config: %s", err)
 		return
 	}
 	err = json.Unmarshal(content, &config)
 
 	if err != nil {
-		log.Println("LoadConfig(): Error unmarshaling JSON", err)
+		log.Errorf("LoadConfig(): Error unmarshaling JSON: %s", err)
 	}
 	return
 }
@@ -306,10 +305,10 @@ func (bot *Bot) SendToChannel(channelName string, message string) *Reply {
 	channel := bot.GetChannelByName(channelName)
 
 	if channel == nil {
-		log.Printf("Couldn't send message, channel %q not found: %q\n", channelName, message)
+		log.Errorf("Couldn't send message, channel %q not found: %q", channelName, message)
 		return nil
 	}
-	log.Printf("Sending to channel %q: %q\n", channelName, message)
+	log.Infof("Sending to channel %q: %q", channelName, message)
 
 	return bot.SendOutgoingMessage(message, channel.ID)
 }
@@ -326,13 +325,13 @@ func (bot *Bot) SendOutgoingMessage(text string, to string) *Reply {
 func (bot *Bot) SendPrivateMessage(username, message string) *Reply {
 	user := bot.GetUser(username)
 	if user == nil {
-		log.Printf("ERROR sending message, user %q not found, dropping message: %q\n", username, message)
+		log.Errorf("ERROR sending message, user %q not found, dropping message: %q", username, message)
 		return nil
 	}
 
 	imChannel := bot.OpenIMChannelWith(user)
 	if imChannel == nil {
-		log.Printf("ERROR initiating private conversation with user %q (%s), dropping message: %q\n", user.ID, user.Name, message)
+		log.Errorf("ERROR initiating private conversation with user %q (%s), dropping message: %q", user.ID, user.Name, message)
 		return nil
 	}
 
@@ -392,12 +391,12 @@ func (bot *Bot) handleRTMEvent(event *slack.RTMEvent) {
 	 * Connection handling...
 	 */
 	case *slack.LatencyReport:
-		log.Printf("Current latency: %v\n", ev)
+		log.Infof("Current latency: %v", ev)
 	case *slack.RTMError:
-		log.Printf("Error: %d - %s\n", ev.Code, ev.Msg)
+		log.Errorf("Error: %d - %s", ev.Code, ev.Msg)
 
 	case *slack.ConnectedEvent:
-		log.Printf("Bot connected, connection_count=%d\n", ev.ConnectionCount)
+		log.Infof("Bot connected, connection_count=%d", ev.ConnectionCount)
 		bot.Myself = *ev.Info.User
 		bot.cacheUsers(ev.Info.Users)
 		bot.cacheChannels(ev.Info.Channels, ev.Info.Groups, ev.Info.IMs)
@@ -410,19 +409,19 @@ func (bot *Bot) handleRTMEvent(event *slack.RTMEvent) {
 		}
 
 	case *slack.DisconnectedEvent:
-		log.Println("Bot disconnected")
+		log.Info("Bot disconnected")
 
 	case *slack.ConnectingEvent:
-		log.Printf("Bot connecting, connection_count=%d, attempt=%d\n", ev.ConnectionCount, ev.Attempt)
+		log.Infof("Bot connecting, connection_count=%d, attempt=%d", ev.ConnectionCount, ev.Attempt)
 
 	case *slack.HelloEvent:
-		log.Println("Got a HELLO from websocket")
+		log.Info("Got a HELLO from websocket")
 
 	/**
 	 * Message dispatch and handling
 	 */
 	case *slack.MessageEvent:
-		log.Printf("Message: %#v\n", ev)
+		log.Infof("Message: %#v", ev)
 		msg = &Message{
 			Msg:        &ev.Msg,
 			SubMessage: ev.SubMessage,
@@ -467,11 +466,11 @@ func (bot *Bot) handleRTMEvent(event *slack.RTMEvent) {
 		msg.applyMentionsMe(bot)
 		msg.applyFromMe(bot)
 
-		//log.Printf("Incoming message subtype=%q:\n\t%q\n\tMessage: %s\n\tmsg.Msg: %#v\n\tSubMessage: %#v\n", msg.Msg.SubType, msg.Text, msg, msg.Msg, msg.SubMessage)
+		//log.Infof("Incoming message subtype=%q:\n\t%q\n\tMessage: %s\n\tmsg.Msg: %#v\n\tSubMessage: %#v", msg.Msg.SubType, msg.Text, msg, msg.Msg, msg.SubMessage)
 
 	case *slack.PresenceChangeEvent:
 		user := bot.Users[ev.User]
-		log.Printf("User %q is now %q\n", user.Name, ev.Presence)
+		log.Infof("User %q is now %q", user.Name, ev.Presence)
 		user.Presence = ev.Presence
 
 	// TODO: manage im_open, im_close, and im_created ?
@@ -582,11 +581,11 @@ func (bot *Bot) handleRTMEvent(event *slack.RTMEvent) {
 	 */
 	case *slack.AckErrorEvent:
 		jsonCnt, _ := json.MarshalIndent(ev, "", "  ")
-		fmt.Printf("Error: %s\n", jsonCnt)
+		log.Errorf("Error: %s", jsonCnt)
 
 	default:
-		log.Printf("Event: %T\n", ev)
-		//log.Printf("Unexpected: %#v\n", ev)
+		log.Infof("Event: %T: %+v", ev, ev)
+		//log.Infof("Unexpected: %#v", ev)
 	}
 
 	// Dispatch listeners
@@ -616,7 +615,7 @@ func (bot *Bot) Disconnect() {
 // GetUser returns a *slack.User by ID, Name, RealName or Email
 func (bot *Bot) GetUser(find string) *slack.User {
 	for _, user := range bot.Users {
-		//log.Printf("Hmmmm, %#v\n", user)
+		//log.Infof("Hmmmm, %#v", user)
 		if user.Profile.Email == find || user.ID == find || user.Name == find || user.RealName == find {
 			return &user
 		}
@@ -653,7 +652,7 @@ func (bot *Bot) OpenIMChannelWith(user *slack.User) *Channel {
 		return dmChannel
 	}
 
-	log.Printf("Opening a new IM conversation with %q (%s)\n", user.ID, user.Name)
+	log.Infof("Opening a new IM conversation with %q (%s)", user.ID, user.Name)
 	_, _, chanID, err := bot.Slack.OpenIMChannel(user.ID)
 	if err != nil {
 		return nil
