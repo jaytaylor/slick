@@ -18,6 +18,7 @@ import (
 	_ "github.com/abourget/slick/totw"
 	_ "github.com/abourget/slick/web"
 	// _ "github.com/abourget/slick/webauth"
+	log "github.com/Sirupsen/logrus"
 	_ "github.com/abourget/slick/recognition"
 	_ "github.com/abourget/slick/webutils"
 	_ "github.com/abourget/slick/wicked"
@@ -26,6 +27,8 @@ import (
 var configFile = flag.String("config", os.Getenv("HOME")+"/.slick.conf", "config file")
 
 func main() {
+	log.SetLevel(log.DebugLevel)
+
 	flag.Parse()
 
 	bot := slick.New(*configFile)
