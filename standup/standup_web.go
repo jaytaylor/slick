@@ -69,6 +69,11 @@ func (standup *Standup) index(w http.ResponseWriter, req *http.Request) {
 const reportTemplate = `<html>
 <head>
 	<title>Standup Report</title>
+	<style>
+	table tr td:first-child {
+		white-space: nowrap;
+	}
+	</style>
 </head>
 <body>
 <table>
