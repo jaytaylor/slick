@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/abourget/slick"
+	"github.com/gigawattio/web"
 	"github.com/gorilla/mux"
 	"github.com/nlopes/slack"
 )
@@ -35,7 +36,7 @@ func (utils *Utils) handleGetUsers(w http.ResponseWriter, r *http.Request) {
 
 	err := enc.Encode(out)
 	if err != nil {
-		webReportError(w, "Error encoding JSON", err)
+		web.RespondWithJson(w, http.StatusInternalServerError, fmt.Errorf("Error encoding JSON: %s", err))
 		return
 	}
 	return
@@ -52,13 +53,8 @@ func (utils *Utils) handleGetChannels(w http.ResponseWriter, r *http.Request) {
 
 	err := enc.Encode(out)
 	if err != nil {
-		webReportError(w, "Error encoding JSON", err)
+		web.RespondWithJson(w, http.StatusInternalServerError, fmt.Errorf("Error encoding JSON: %s", err))
 		return
 	}
 	return
-}
-
-func webReportError(w http.ResponseWriter, msg string, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	w.Write([]byte(fmt.Sprintf("%s\n\n%s\n", msg, err)))
 }
