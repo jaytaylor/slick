@@ -1,10 +1,13 @@
 package standup
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
+	// "fmt"
 	"net/http"
+	"text/template"
 
+	// log "github.com/Sirupsen/logrus"
 	"github.com/abourget/slick"
 	"github.com/boltdb/bolt"
 	"github.com/gigawattio/web"
@@ -23,7 +26,8 @@ func (standup *Standup) activateRoutes() *hitch.Hitch {
 			},
 			RouteData: []route.RouteDatum{
 				{"get", "/plugins/standup", standup.index},
-				{"get", "/plugins/standup/:date", standup.dateLookup},
+				{"get", "/plugins/standup/v1/:date", standup.dateLookup},
+				// {"get", "/plugins/standup/:date", standup.dateLookupHTML},
 				// {"post", "/v1/archive/*url", service.archive},
 				// {"post", "/v1/archive.json/*url", service.archiveJson},
 				// {"post", "/v1/proxy/*url", service.proxy},
@@ -43,11 +47,54 @@ func (standup *Standup) InitWebPlugin(bot *slick.Bot, privRouter *mux.Router, pu
 }
 
 func (standup *Standup) index(w http.ResponseWriter, req *http.Request) {
-	generics.GenericObjectEndpoint(w, req, func() (interface{}, error) {
-		fmt.Println(hitch.Params(req).ByName("id"))
-		return map[string]string{"hrm": "yep"}, nil
-	})
+	// generics.GenericObjectEndpoint(w, req, func() (interface{}, error) {
+	// 	fmt.Println(hitch.Params(req).ByName("id"))
+	// 	return map[string]string{"hrm": "yep"}, nil
+	// })
+	t := template.Must(template.New("listing").Parse(reportTemplate))
+	sm, err := standup.standupMap()
+	if err != nil {
+		web.RespondWithHtml(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	buf := &bytes.Buffer{}
+	if err := t.Execute(buf, sm); err != nil {
+		web.RespondWithHtml(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	// sm["20"][0].Data.
+	web.RespondWithHtml(w, http.StatusOK, buf.String())
 }
+
+const reportTemplate = `<html>
+<head>
+	<title>Standup Report</title>
+</head>
+<body>
+<table>
+	<tr>
+		<th>Date</th>
+		<th>Name</th>
+		<th>Updates</th>
+	</tr>
+	{{range $date, $entries := .}}
+	{{range $i, $entry := $entries}}
+	<tr>
+		<td>{{$date}}</td>
+		<td>{{$entry.Name}}</td>
+		<td>
+			<ul>
+				<li>Today: {{$entry.Data.Today}}</li>
+				<li>Yesterday: {{$entry.Data.Yesterday}}</li>
+				<li>Blocking: {{$entry.Data.Blocking}}</li>
+			</ul>
+		</td>
+	</tr>
+	{{end}}
+	{{end}}
+</table>
+</body>
+</html>`
 
 func (standup *Standup) dateLookup(w http.ResponseWriter, req *http.Request) {
 	generics.GenericObjectEndpoint(w, req, func() (interface{}, error) {
@@ -58,17 +105,7 @@ func (standup *Standup) dateLookup(w http.ResponseWriter, req *http.Request) {
 		// }{
 		// 	Users: make([]*standupUser, 0),
 		// }
-		sm := standupMap{}
-		err := standup.bot.DB.View(func(tx *bolt.Tx) error {
-			var (
-				bucket = tx.Bucket([]byte(bucketKey))
-				src    = bucket.Get([]byte(bucketKey))
-			)
-			if err := json.Unmarshal(src, &sm); err != nil {
-				return err
-			}
-			return nil
-		})
+		sm, err := standup.standupMap()
 		if err != nil {
 			return nil, err
 		}
@@ -83,4 +120,22 @@ func (standup *Standup) dateLookup(w http.ResponseWriter, req *http.Request) {
 			return nil, generics.RequestAlreadyHandled()
 		}
 	})
+}
+
+func (standup *Standup) standupMap() (standupMap, error) {
+	sm := standupMap{}
+	err := standup.bot.DB.View(func(tx *bolt.Tx) error {
+		var (
+			bucket = tx.Bucket([]byte(bucketKey))
+			src    = bucket.Get([]byte(bucketKey))
+		)
+		if err := json.Unmarshal(src, &sm); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return sm, nil
 }
