@@ -89,8 +89,8 @@ const reportTemplate = `<html>
 		<td>{{$entry.Name}}</td>
 		<td>
 			<ul>
-				<li>Today: {{$entry.Data.Today}}</li>
 				<li>Yesterday: {{$entry.Data.Yesterday}}</li>
+				<li>Today: {{$entry.Data.Today}}</li>
 				<li>Blocking: {{$entry.Data.Blocking}}</li>
 			</ul>
 		</td>
