@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/abourget/slick"
 	_ "github.com/abourget/slick/bugger"
 	_ "github.com/abourget/slick/deployer"
@@ -13,13 +14,12 @@ import (
 	_ "github.com/abourget/slick/hooker"
 	_ "github.com/abourget/slick/mooder"
 	_ "github.com/abourget/slick/plotberry"
+	_ "github.com/abourget/slick/recognition"
 	_ "github.com/abourget/slick/standup"
 	_ "github.com/abourget/slick/todo"
 	_ "github.com/abourget/slick/totw"
 	_ "github.com/abourget/slick/web"
-	// _ "github.com/abourget/slick/webauth"
-	log "github.com/Sirupsen/logrus"
-	_ "github.com/abourget/slick/recognition"
+	_ "github.com/abourget/slick/webauth"
 	_ "github.com/abourget/slick/webutils"
 	_ "github.com/abourget/slick/wicked"
 )
