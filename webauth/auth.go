@@ -3,11 +3,11 @@ package webauth
 import (
 	"encoding/gob"
 	"fmt"
-	"log"
 	"net/http"
 
-	"github.com/nlopes/slack"
+	log "github.com/Sirupsen/logrus"
 	"github.com/abourget/slick"
+	"github.com/nlopes/slack"
 	"golang.org/x/oauth2"
 )
 
@@ -89,7 +89,7 @@ func (mw *OAuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, err := mw.plugin.AuthenticatedUser(r)
 	if err != nil {
 		if r.URL.Path == "/" {
-			log.Println("Not logged in", err)
+			log.Errorf("Not logged in: %s", err)
 			url := mw.oauthCfg.AuthCodeURL("", oauth2.SetAuthURLParam("team", mw.bot.Config.TeamID))
 			http.Redirect(w, r, url, http.StatusFound)
 		} else {
@@ -112,7 +112,7 @@ func (mw *OAuthMiddleware) handleOAuth2Callback(w http.ResponseWriter, r *http.R
 		sess.Values["profile"] = profile
 		err := sess.Save(r, w)
 		if err != nil {
-			fmt.Println("Error saving cookie:", err)
+			log.Errorf("Error saving cookie: %s", err)
 			w.Write([]byte(err.Error()))
 			return
 		}
@@ -126,10 +126,9 @@ func (mw *OAuthMiddleware) doOAuth2Roundtrip(w http.ResponseWriter, r *http.Requ
 
 	token, err := mw.oauthCfg.Exchange(oauth2.NoContext, code)
 	if err != nil {
-		log.Println("OAuth2: ", err)
+		log.Errorf("OAuth2 problem: %s", err)
 		return nil, fmt.Errorf("Error processing token.")
 	}
-
 	client := slack.New(token.AccessToken)
 
 	resp, err := client.AuthTest()
