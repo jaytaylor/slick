@@ -4,9 +4,11 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net/http"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/abourget/slick"
+	"github.com/gigawattio/web"
 	"github.com/nlopes/slack"
 	"golang.org/x/oauth2"
 )
@@ -86,15 +88,18 @@ func (mw *OAuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := mw.plugin.AuthenticatedUser(r)
-	if err != nil {
-		if r.URL.Path == "/" {
-			log.Errorf("Not logged in: %s", err)
-			url := mw.oauthCfg.AuthCodeURL("", oauth2.SetAuthURLParam("team", mw.bot.Config.TeamID))
-			http.Redirect(w, r, url, http.StatusFound)
-		} else {
-			w.WriteHeader(http.StatusForbidden)
+	if _, err := mw.plugin.AuthenticatedUser(r); err != nil {
+		cookie := &http.Cookie{
+			Name:     "return-to",
+			Value:    r.URL.Path,
+			Path:     "/",
+			HttpOnly: true,
+			Expires:  time.Now().Add(5 * time.Minute),
 		}
+		http.SetCookie(w, cookie)
+		log.Errorf("Not logged in: %s", err)
+		url := mw.oauthCfg.AuthCodeURL("", oauth2.SetAuthURLParam("team", mw.bot.Config.TeamID))
+		http.Redirect(w, r, url, http.StatusFound)
 		return
 	}
 
@@ -117,7 +122,22 @@ func (mw *OAuthMiddleware) handleOAuth2Callback(w http.ResponseWriter, r *http.R
 			return
 		}
 
-		http.Redirect(w, r, "/", http.StatusFound)
+		if cookie, err := r.Cookie("return-to"); err == nil && cookie.Value != "" {
+			// "Remove" the cookie by sending an "old" cookie with an expired date.
+			oldCookie := &http.Cookie{
+				Name:     "return-to",
+				Path:     "/",
+				HttpOnly: true,
+				Expires:  time.Now().Add(-999 * time.Hour),
+			}
+			http.SetCookie(w, oldCookie)
+			http.Redirect(w, r, cookie.Value, http.StatusFound)
+		} else if err != nil {
+			web.RespondWithText(w, http.StatusInternalServerError, err)
+			return
+		} else {
+			http.Redirect(w, r, "/", http.StatusFound)
+		}
 	}
 }
 
