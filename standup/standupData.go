@@ -5,8 +5,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 type standupData struct {
@@ -17,7 +15,6 @@ type standupData struct {
 }
 
 func (sd *standupData) Update(section sectionMatch) error {
-	log.Infof("sd=%+v", sd)
 	switch section.name[0] {
 	case 'y':
 		sd.Yesterday = section.text
